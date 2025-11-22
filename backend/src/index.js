@@ -35,7 +35,7 @@ app.use(helmet({
 app.use(cors({
   origin: [
     "http://localhost:3021",
-    "https://vercel.com/aryan-guptas-projects-ff00e533/cse-department"
+    "https://cse-department-rouge.vercel.app/"
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
