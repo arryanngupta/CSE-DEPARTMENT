@@ -1,0 +1,64 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: lnmiit_cse_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: lnmiit_cse
+      MYSQL_USER: lnmiit_user
+      MYSQL_PASSWORD: lnmiit_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - lnmiit_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: lnmiit_cse_backend
+    restart: unless-stopped
+    ports:
+      - "3021:3021"
+    environment:
+      DB_HOST=mysql
+      DB_PORT=3306
+      DB_USER=lnmiit_user
+      DB_PASS=lnmiit_pass
+      DB_NAME=lnmiit_cse
+      JWT_SECRET=your-production-secret-key-minimum-32-characters
+      PORT=3021
+      NODE_ENV=production
+      ORIGIN=http://localhost:3021
+    depends_on:
+      - mysql
+    volumes:
+      - ./backend/src/uploads:/app/src/uploads
+    networks:
+      - lnmiit_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: lnmiit_cse_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - lnmiit_network
+
+volumes:
+  mysql_data:
+
+networks:
+  lnmiit_network:
+    driver: bridge

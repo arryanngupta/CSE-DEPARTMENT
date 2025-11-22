@@ -1,0 +1,136 @@
+/* Import fonts */
+@import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700;900&family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* Tailwind Layers (v4 compatible) */
+@tailwind base;
+@tailwind utilities;
+
+/* Base Styles */
+@layer base {
+  :root {
+    --color-primary: 166 25 46; /* #A6192E */
+    --color-primary-dark: 125 15 34; /* #7D0F22 */
+    --color-primary-light: 252 237 239; /* #FCEDEF */
+    --color-accent: 249 195 73; /* #F9C349 */
+    --color-neutral-dark: 26 26 26; /* #1A1A1A */
+    --color-neutral-text: 74 74 74; /* #4A4A4A */
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply font-inter text-neutral-text antialiased bg-white;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-merriweather text-neutral-dark;
+  }
+}
+
+/* ✅ Components moved into utilities layer */
+@layer utilities {
+  /* Button Variants */
+  .btn-primary {
+    @apply bg-primary hover:bg-primary-dark text-white font-medium px-6 py-3 rounded-lg
+           transform transition-all duration-200 ease-out
+           hover:shadow-lg hover:-translate-y-0.5
+           focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none;
+  }
+  
+  .btn-secondary {
+    @apply bg-white hover:bg-gray-50 text-primary border-2 border-primary font-medium px-6 py-[10px] rounded-lg
+           transform transition-all duration-200 ease-out
+           hover:shadow-md hover:-translate-y-0.5
+           focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none;
+  }
+
+  .btn-tertiary {
+    @apply text-primary hover:text-primary-dark font-medium px-4 py-2
+           transition-colors duration-200 ease-out
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2;
+  }
+
+  /* Input Fields */
+  .input-field {
+    @apply w-full px-4 py-3 bg-white border border-gray-300 rounded-lg
+           focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent
+           placeholder:text-gray-400 
+           transition-all duration-200 ease-out;
+  }
+
+  /* Card Base */
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-100
+           transform transition-all duration-200 ease-out
+           hover:shadow-lg hover:-translate-y-1;
+  }
+
+  /* Section Containers */
+  .section-container {
+    @apply container mx-auto px-4 py-16 sm:px-6 lg:px-8;
+  }
+
+  /* Page Headers */
+  .page-header {
+    @apply text-4xl md:text-5xl font-bold text-neutral-dark mb-4;
+  }
+
+  .page-subheader {
+    @apply text-xl text-neutral-text mb-8;
+  }
+
+  /* Academic Decorative Elements */
+  .academic-divider {
+    @apply h-1 w-24 bg-primary my-8;
+  }
+
+  /* Animation Classes */
+  .animate-fade-in {
+    @apply opacity-0 animate-[fadeIn_0.5s_ease-out_forwards];
+  }
+
+  .animate-slide-up {
+    @apply opacity-0 translate-y-4 animate-[slideUp_0.5s_ease-out_forwards];
+  }
+
+  /* Loading States */
+  .skeleton {
+    @apply animate-pulse bg-gray-200 rounded;
+  }
+
+  /* Responsive Typography */
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .text-pretty {
+    text-wrap: pretty;
+  }
+
+  /* Neon Glow */
+  .neon-glow {
+    box-shadow: 0 0 12px rgba(168, 85, 247, 0.6),
+                0 0 24px rgba(168, 85, 247, 0.3);
+  }
+}
+
+/* Keyframes */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

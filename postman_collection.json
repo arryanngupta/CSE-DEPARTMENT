@@ -1,0 +1,214 @@
+{
+  "info": {
+    "name": "LNMIIT CSE API",
+    "description": "API endpoints for LNMIIT CSE Department Website",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3022"
+    },
+    {
+      "key": "token",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@lnmiit.ac.in\",\n  \"password\": \"Admin@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Get Me",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Public",
+      "item": [
+        {
+          "name": "Get Sliders",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/sliders"
+          }
+        },
+        {
+          "name": "Get People",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/people?page=1&limit=20"
+          }
+        },
+        {
+          "name": "Get Single Person (Slug)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/people/faculty-slug-here"
+          }
+        },
+        {
+          "name": "Get Programs",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/programs"
+          }
+        },
+        {
+          "name": "Get News",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/news?published=1&page=1&limit=10"
+          }
+        },
+        {
+          "name": "Get News by ID",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/news/1"
+          }
+        },
+        {
+          "name": "Get Events",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/events?upcoming=1"
+          }
+        },
+        {
+          "name": "Get Achievements",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/achievements?page=1&limit=12"
+          }
+        },
+        {
+          "name": "Get Newsletters",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/newsletters"
+          }
+        },
+        {
+          "name": "Get Directory",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/directory"
+          }
+        },
+        {
+          "name": "Get Info Block",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/info/about_department"
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Admin - Sliders",
+      "item": [
+        {
+          "name": "Get All Sliders",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/admin/sliders"
+          }
+        },
+        {
+          "name": "Create Slider",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file"
+                },
+                {
+                  "key": "caption",
+                  "value": "Welcome to CSE Department",
+                  "type": "text"
+                },
+                {
+                  "key": "order",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "isActive",
+                  "value": "true",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/admin/sliders"
+          }
+        },
+        {
+          "name": "Delete Slider",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/admin/sliders/1"
+          }
+        }
+      ]
+    }
+  ]
+}
