@@ -33,7 +33,10 @@ app.use(helmet({
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.ORIGIN || 'http://localhost:3021',
+  origin: [
+    "http://localhost:3021",
+    "https://vercel.com/aryan-guptas-projects-ff00e533/cse-department"
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
