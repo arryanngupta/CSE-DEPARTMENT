@@ -3,6 +3,7 @@ import express from 'express';
 import { authenticate, requireAdmin } from '../../middleware/auth.js';
 import { uploadImage, uploadPDF } from '../../config/multer.js';
 import { uploadLimiter } from '../../middleware/rateLimiter.js';
+import { loginAdmin } from '../../controllers/authController.js';
 import {
   createSlider, updateSlider, deleteSlider, getAllSliders,
   createPerson, updatePerson, deletePerson, getAllPeople,
@@ -24,6 +25,10 @@ import {
 
 const router = express.Router();
 
+/* ---------- PUBLIC ROUTE ---------- */
+router.post('/login', loginAdmin);
+
+/* ---------- PROTECTED ROUTES ---------- */
 router.use(authenticate);
 router.use(requireAdmin);
 
