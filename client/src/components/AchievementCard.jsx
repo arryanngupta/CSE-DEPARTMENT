@@ -1,5 +1,4 @@
 import { motion } from 'framer-motion';
-import { getImageUrl } from '../utils/imageUtils';
 
 const AchievementCard = ({ achievement }) => {
   const cardVariants = {
@@ -28,7 +27,7 @@ const AchievementCard = ({ achievement }) => {
       {achievement.image_path && (
         <motion.div className="aspect-video overflow-hidden bg-gray-100 relative" whileHover="hover">
           <motion.img
-            src={getImageUrl(achievement.image_path)}
+            src={achievement.image_path}   // ✅ No getImageUrl
             alt={achievement.title || 'Achievement image'}
             variants={imageVariants}
             className="w-full h-full object-cover"
@@ -47,13 +46,11 @@ const AchievementCard = ({ achievement }) => {
 
         {achievement.students && (
           <div className="flex items-center mb-3 text-sm">
-            {/* ✅ FIXED SVG (No arc flag error) */}
             <svg
               className="w-5 h-5 text-[#A6192E] mr-2"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
-              aria-hidden="true"
             >
               <path
                 strokeLinecap="round"
@@ -78,18 +75,16 @@ const AchievementCard = ({ achievement }) => {
             href={achievement.link}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center text-[#A6192E] font-medium text-sm hover:text-[#7D0F22] group/link focus:outline-none focus:ring-2 focus:ring-[#A6192E]/30 rounded"
+            className="inline-flex items-center text-[#A6192E] font-medium text-sm hover:text-[#7D0F22]"
             whileHover={{ x: 5 }}
             transition={{ type: 'spring', stiffness: 450, damping: 18 }}
-            aria-label="Read more about achievement"
           >
             Read More
             <svg
-              className="w-4 h-4 ml-1 transition-transform group-hover/link:translate-x-1"
+              className="w-4 h-4 ml-1"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
-              aria-hidden="true"
             >
               <path
                 strokeLinecap="round"
@@ -102,25 +97,9 @@ const AchievementCard = ({ achievement }) => {
         )}
       </div>
 
-      {/* Decorative underline */}
       <div className="pointer-events-none absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-[#A6192E] via-[#7D0F22] to-[#A6192E] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
     </motion.div>
   );
 };
-
-// Loading Skeleton
-export const AchievementCardSkeleton = () => (
-  <div className="rounded-xl overflow-hidden bg-white border border-gray-100 shadow-sm">
-    <div className="aspect-video bg-gray-200 animate-pulse" />
-    <div className="p-6 space-y-3">
-      <div className="h-6 bg-gray-200 rounded animate-pulse w-3/4" />
-      <div className="h-4 bg-gray-200 rounded animate-pulse w-1/2" />
-      <div className="space-y-2">
-        <div className="h-4 bg-gray-200 rounded animate-pulse" />
-        <div className="h-4 bg-gray-200 rounded animate-pulse w-5/6" />
-      </div>
-    </div>
-  </div>
-);
 
 export default AchievementCard;

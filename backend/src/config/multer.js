@@ -1,48 +1,96 @@
+// src/config/multer.js
 import multer from 'multer';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
+import cloudinary from './cloudinary.js';
+import streamifier from 'streamifier';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const uploadDir = path.join(__dirname, '../uploads');
-const imageDir = path.join(uploadDir, 'images');
-const pdfDir = path.join(uploadDir, 'pdfs');
-
-// Create directories if they don't exist
-[uploadDir, imageDir, pdfDir].forEach(dir => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+// set up multer memory storage
+const memoryStorage = multer.memoryStorage();
+const upload = multer({
+  storage: memoryStorage,
+  limits: {
+    fileSize: 20 * 1024 * 1024 // 20MB default (images smaller by usage)
   }
 });
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const isPdf = file.mimetype === 'application/pdf';
-    cb(null, isPdf ? pdfDir : imageDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const fileFilter = (req, file, cb) => {
-  const allowedImageTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
-  const allowedPdfTypes = ['application/pdf'];
-  
-  if (allowedImageTypes.includes(file.mimetype) || allowedPdfTypes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Invalid file type. Only JPEG, PNG, WEBP, and PDF are allowed.'), false);
-  }
+/**
+ * Helper: upload buffer to Cloudinary using upload_stream
+ * resourceType: 'image' or 'raw' (for pdf)
+ * folder: folder name in cloudinary
+ */
+const uploadBufferToCloudinary = (buffer, { folder = '', resource_type = 'image', filename }) => {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      { folder, resource_type, public_id: filename ? filename.replace(/[^a-zA-Z0-9-_]/g, '_') : undefined },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result);
+      }
+    );
+    streamifier.createReadStream(buffer).pipe(uploadStream);
+  });
 };
 
-export const upload = multer({
-  storage,
-  fileFilter,
-  limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB
-  }
-});
+// Middleware factory for images (jpg/png/webp)
+export const uploadImage = (fieldName = 'image') => {
+  // first parse single file into memory
+  const single = upload.single(fieldName);
+
+  return async (req, res, next) => {
+    single(req, res, async (err) => {
+      if (err) return next(err);
+      if (!req.file) return next();
+
+      // Basic mime/type check
+      const allowed = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+      if (!allowed.includes(req.file.mimetype)) {
+        return res.status(400).json({ error: 'Invalid image type. Allowed: jpg, jpeg, png, webp' });
+      }
+
+      try {
+        const result = await uploadBufferToCloudinary(req.file.buffer, {
+          folder: 'cse_department/images',
+          resource_type: 'image'
+        });
+
+        // normalize to existing code expectations
+        req.file.path = result.secure_url;
+        req.file.public_id = result.public_id;
+        req.file.cloudinary_raw = result; // full response if needed
+        next();
+      } catch (uploadErr) {
+        next(uploadErr);
+      }
+    });
+  };
+};
+
+// Middleware factory for pdf (field name default 'pdf')
+export const uploadPDF = (fieldName = 'pdf') => {
+  const single = upload.single(fieldName);
+
+  return async (req, res, next) => {
+    single(req, res, async (err) => {
+      if (err) return next(err);
+      if (!req.file) return next();
+
+      const allowed = ['application/pdf'];
+      if (!allowed.includes(req.file.mimetype)) {
+        return res.status(400).json({ error: 'Invalid file type. Only PDF allowed' });
+      }
+
+      try {
+        const result = await uploadBufferToCloudinary(req.file.buffer, {
+          folder: 'cse_department/pdfs',
+          resource_type: 'raw' // PDFs -> raw
+        });
+
+        req.file.path = result.secure_url;
+        req.file.public_id = result.public_id;
+        req.file.cloudinary_raw = result;
+        next();
+      } catch (uploadErr) {
+        next(uploadErr);
+      }
+    });
+  };
+};

@@ -3,25 +3,18 @@ import helmet from 'helmet';
 import cors from 'cors';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import routes from './routes/index.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { sequelize } from './config/database.js';
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const app = express();
 const PORT = process.env.PORT || 3022;
 
-// Configure Helmet with adjusted settings for images
+// Helmet Security
 app.use(helmet({
-  crossOriginResourcePolicy: { 
-    policy: 'cross-origin' 
-  },
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
@@ -31,7 +24,7 @@ app.use(helmet({
   }
 }));
 
-// CORS configuration
+// CORS
 app.use(cors({
   origin: [
     "http://localhost:3021",
@@ -46,15 +39,7 @@ app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve uploaded files with CORS headers
-app.use('/uploads', (req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', process.env.ORIGIN || 'http://localhost:3021');
-  res.setHeader('Access-Control-Allow-Methods', 'GET');
-  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-  next();
-}, express.static(path.join(__dirname, 'uploads')));
-
-// Routes
+// API Routes
 app.use('/api', routes);
 
 // Health check
@@ -65,7 +50,7 @@ app.get('/health', (req, res) => {
 // Error handler
 app.use(errorHandler);
 
-// Database connection and server start
+// Start server
 const startServer = async () => {
   try {
     await sequelize.authenticate();

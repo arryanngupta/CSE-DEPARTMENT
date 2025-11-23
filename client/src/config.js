@@ -1,8 +1,11 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3022';
+export const getImageUrl = (path) => {
+  if (!path) return '';
+  if (path.startsWith('http')) return path; // cloudinary
+  return `${BASE_URL}${path}`.replace(/([^:]\/)\/+/g, "$1");
+};
 
-// Add other config values as needed
-export const config = {
-  apiUrl: API_BASE_URL,
-  imageUrl: `${API_BASE_URL}/uploads/images`,
-  pdfUrl: `${API_BASE_URL}/uploads/pdfs`
+export const getPdfUrl = (path) => {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  return `${BASE_URL}${path}`.replace(/([^:]\/)\/+/g, "$1");
 };

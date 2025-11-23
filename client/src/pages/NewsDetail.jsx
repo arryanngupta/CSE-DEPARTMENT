@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Loading from '../components/Loading.jsx';
 import { publicAPI } from '../lib/api.js';
+import { getImageUrl } from '../utils/imageUtils.js';
 
 const NewsDetail = () => {
   const { id } = useParams();
@@ -31,9 +32,7 @@ const NewsDetail = () => {
     });
   };
 
-  if (loading) {
-    return <Loading />;
-  }
+  if (loading) return <Loading />;
 
   if (!news) {
     return (
@@ -59,11 +58,11 @@ const NewsDetail = () => {
 
       <article className="max-w-4xl mx-auto">
         <h1 className="text-4xl font-bold text-gray-900 mb-4">{news.title}</h1>
-        <p className="text-gray-500 mb-8">{formatDate(news.date)}</p>
+       <p className="text-gray-500 mb-8">{formatDate(news.date)}</p>
 
         {news.image_path && (
           <img
-            src={news.image_path}
+            src={getImageUrl(news.image_path)}
             alt={news.title}
             className="w-full rounded-lg mb-8"
           />

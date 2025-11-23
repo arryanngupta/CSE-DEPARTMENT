@@ -11,19 +11,22 @@ export default function FacultyCard({ person }) {
     <Link to={`/people/${slug}`}>
       <div className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer hover:-translate-y-1 w-full max-w-xs mx-auto">
 
-        {/* Photo - Taller & Full image without cropping */}
+        {/* Photo Box */}
         <div className="w-full h-64 bg-gray-100 flex items-center justify-center overflow-hidden">
+
           {person.photo_path ? (
             <img
-              src={person.photo_path}
-              alt={person.name}
+              src={person.photo_path}           // ✅ Cloudinary direct URL
+              alt={person.name || "Faculty Photo"}
               className="max-h-full max-w-full object-contain"
+              loading="lazy"                    // ⭐ Better performance
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gray-300">
               <span className="text-gray-600 text-4xl">👤</span>
             </div>
           )}
+
         </div>
 
         {/* Content */}
@@ -60,7 +63,9 @@ export default function FacultyCard({ person }) {
           <button className="w-full mt-4 py-2 bg-red-700 hover:bg-red-800 text-white text-sm font-medium rounded-lg">
             View Profile →
           </button>
+
         </div>
+
       </div>
     </Link>
   );

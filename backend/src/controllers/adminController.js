@@ -1,4 +1,4 @@
-// src/controllers/adminController.js
+// backend/src/controllers/adminController.js
 import {
   Slider,
   People,
@@ -18,8 +18,8 @@ import {
   SectionContent
 } from '../db/models/index.js';
 import { Op } from "sequelize";
-import { deleteFile } from '../services/fileService.js';
 import { generateSlug } from '../utils/slugUtils.js';
+import cloudinary from '../config/cloudinary.js'; // default export from cloudinary config
 
 /**
  * Helper: parse booleans sent as "true"/"false" or real booleans or missing.
@@ -32,6 +32,41 @@ const parseBool = (v) => {
     if (v.toLowerCase() === 'true') return true;
   }
   return v === undefined ? undefined : Boolean(v);
+};
+
+/**
+ * Extract Cloudinary public id from a cloudinary url.
+ * Example:
+ *  https://res.cloudinary.com/<cloud>/image/upload/v12345/folder/name.jpg
+ * -> folder/name
+ */
+const getPublicIdFromCloudinaryUrl = (url) => {
+  try {
+    if (!url) return null;
+    const idx = url.indexOf('/upload/');
+    if (idx === -1) return null;
+    let afterUpload = url.substring(idx + '/upload/'.length);
+    // remove version prefix like v123456/
+    afterUpload = afterUpload.replace(/^v\d+\//, '');
+    // remove extension
+    const dotIdx = afterUpload.lastIndexOf('.');
+    if (dotIdx !== -1) afterUpload = afterUpload.substring(0, dotIdx);
+    return afterUpload;
+  } catch (e) {
+    return null;
+  }
+};
+
+const deleteCloudinaryResource = async (url, resourceType = 'image') => {
+  try {
+    const publicId = getPublicIdFromCloudinaryUrl(url);
+    if (!publicId) return false;
+    await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
+    return true;
+  } catch (err) {
+    console.warn('Cloudinary deletion failed for', url, err?.message || err);
+    return false;
+  }
 };
 
 /* ==========================
@@ -52,7 +87,7 @@ export const createSlider = async (req, res, next) => {
     if (!req.file) return res.status(400).json({ error: 'Image is required' });
 
     const slider = await Slider.create({
-      image_path: `/uploads/images/${req.file.filename}`,
+      image_path: req.file.path,
       caption,
       order,
       isActive: isActive === undefined ? true : isActive
@@ -78,8 +113,8 @@ export const updateSlider = async (req, res, next) => {
     if (isActive !== undefined) updateData.isActive = isActive;
 
     if (req.file) {
-      if (slider.image_path) deleteFile(slider.image_path);
-      updateData.image_path = `/uploads/images/${req.file.filename}`;
+      if (slider.image_path) await deleteCloudinaryResource(slider.image_path, 'image');
+      updateData.image_path = req.file.path;
     }
 
     await slider.update(updateData);
@@ -93,7 +128,7 @@ export const deleteSlider = async (req, res, next) => {
     const slider = await Slider.findByPk(id);
     if (!slider) return res.status(404).json({ error: 'Slider not found' });
 
-    if (slider.image_path) deleteFile(slider.image_path);
+    if (slider.image_path) await deleteCloudinaryResource(slider.image_path, 'image');
     await slider.destroy();
 
     res.json({ data: { message: 'Slider deleted successfully' } });
@@ -101,12 +136,12 @@ export const deleteSlider = async (req, res, next) => {
 };
 
 /* ==========================
-   PEOPLE (UPDATED)
+   PEOPLE
    ========================== */
 export const getAllPeople = async (req, res, next) => {
   try {
-    const people = await People.findAll({ 
-      order: [['order', 'ASC'], ['name', 'ASC']] 
+    const people = await People.findAll({
+      order: [['order', 'ASC'], ['name', 'ASC']]
     });
     res.json({ data: people });
   } catch (error) { next(error); }
@@ -151,17 +186,12 @@ export const createPerson = async (req, res, next) => {
       webpage,
       research_areas,
       bio,
-
-      // 🔥 FIXED: "Invalid date" bug
       joining_date: joining_date ? new Date(joining_date) : null,
-
       department: department || "Computer Science & Engineering",
-
       education: education ? JSON.parse(education) : [],
       publications: publications ? JSON.parse(publications) : [],
       workshops: workshops ? JSON.parse(workshops) : [],
-
-      photo_path: req.file ? `/uploads/images/${req.file.filename}` : null,
+      photo_path: req.file ? req.file.path : null,
       order
     });
 
@@ -174,8 +204,6 @@ export const createPerson = async (req, res, next) => {
     next(err);
   }
 };
-
-
 
 export const updatePerson = async (req, res, next) => {
   try {
@@ -206,9 +234,6 @@ export const updatePerson = async (req, res, next) => {
 
     const updateData = {};
 
-    /* ===============================
-       HANDLE NAME + SLUG UPDATE
-       =============================== */
     if (name !== undefined) {
       updateData.name = name;
 
@@ -237,9 +262,6 @@ export const updatePerson = async (req, res, next) => {
       }
     }
 
-    /* ===============================
-       NORMAL FIELDS
-       =============================== */
     if (designation !== undefined) updateData.designation = designation;
     if (email !== undefined) updateData.email = email;
     if (phone !== undefined) updateData.phone = phone;
@@ -247,16 +269,12 @@ export const updatePerson = async (req, res, next) => {
     if (research_areas !== undefined) updateData.research_areas = research_areas;
     if (bio !== undefined) updateData.bio = bio;
 
-    // 🔥 FIXED: Turns empty date into NULL instead of "Invalid date"
     if (joining_date !== undefined)
       updateData.joining_date = joining_date ? new Date(joining_date) : null;
 
     if (department !== undefined)
       updateData.department = department || "Computer Science & Engineering";
 
-    /* ===============================
-       JSON FIELDS
-       =============================== */
     if (education !== undefined)
       updateData.education = education ? JSON.parse(education) : [];
 
@@ -268,13 +286,9 @@ export const updatePerson = async (req, res, next) => {
 
     if (order !== undefined) updateData.order = order;
 
-    /* ===============================
-       HANDLE IMAGE UPDATE
-       =============================== */
     if (req.file) {
-      if (person.photo_path) deleteFile(person.photo_path);
-
-      updateData.photo_path = `/uploads/images/${req.file.filename}`;
+      if (person.photo_path) await deleteCloudinaryResource(person.photo_path, 'image');
+      updateData.photo_path = req.file.path;
     }
 
     await person.update(updateData);
@@ -295,7 +309,7 @@ export const deletePerson = async (req, res, next) => {
     const person = await People.findByPk(id);
     if (!person) return res.status(404).json({ error: 'Person not found' });
 
-    if (person.photo_path) deleteFile(person.photo_path);
+    if (person.photo_path) await deleteCloudinaryResource(person.photo_path, 'image');
     await person.destroy();
 
     res.json({ data: { message: 'Person deleted successfully' } });
@@ -363,7 +377,7 @@ export const createProgram = async (req, res, next) => {
       duration,
       total_credits,
       display_order,
-      curriculum_pdf_path: req.file ? `/uploads/pdfs/${req.file.filename}` : null
+      curriculum_pdf_path: req.file ? req.file.path : null
     });
 
     res.status(201).json({ data: program });
@@ -378,8 +392,8 @@ export const updateProgram = async (req, res, next) => {
 
     const updateData = { ...req.body };
     if (req.file) {
-      if (program.curriculum_pdf_path) deleteFile(program.curriculum_pdf_path);
-      updateData.curriculum_pdf_path = `/uploads/pdfs/${req.file.filename}`;
+      if (program.curriculum_pdf_path) await deleteCloudinaryResource(program.curriculum_pdf_path, 'raw');
+      updateData.curriculum_pdf_path = req.file.path;
     }
 
     await program.update(updateData);
@@ -393,14 +407,14 @@ export const deleteProgram = async (req, res, next) => {
     const program = await Program.findByPk(id);
     if (!program) return res.status(404).json({ error: 'Program not found' });
 
-    if (program.curriculum_pdf_path) deleteFile(program.curriculum_pdf_path);
+    if (program.curriculum_pdf_path) await deleteCloudinaryResource(program.curriculum_pdf_path, 'raw');
     await program.destroy();
 
     res.json({ data: { message: 'Program deleted successfully' } });
   } catch (error) { next(error); }
 };
 
-/* Program sections (with nested semesters/courses/outcomes/content when requested) */
+/* Program sections */
 export const getProgramSections = async (req, res, next) => {
   try {
     const programId = req.params.id;
@@ -457,7 +471,6 @@ export const createProgramSection = async (req, res, next) => {
       is_expanded
     });
 
-    // return with nested relationships
     const created = await ProgramSection.findByPk(section.id, {
       include: [
         { model: CurriculumSemester, as: 'semesters', separate: true, order: [['display_order', 'ASC']] },
@@ -498,7 +511,7 @@ export const deleteProgramSection = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
-/* Section content create/update */
+/* Section content */
 export const updateSectionContent = async (req, res, next) => {
   try {
     const { section_id, content_html } = req.body;
@@ -581,7 +594,6 @@ export const deleteCurriculumSemester = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
-/* Courses */
 export const createCurriculumCourse = async (req, res, next) => {
   try {
     const {
@@ -658,7 +670,7 @@ export const createNews = async (req, res, next) => {
       date,
       summary,
       body,
-      image_path: req.file ? `/uploads/images/${req.file.filename}` : null,
+      image_path: req.file ? req.file.path : null,
       isPublished: isPublished === undefined ? true : isPublished
     });
     res.status(201).json({ data: news });
@@ -674,8 +686,8 @@ export const updateNews = async (req, res, next) => {
     const updateData = { ...req.body };
     if (updateData.date) updateData.date = new Date(updateData.date);
     if (req.file) {
-      if (news.image_path) deleteFile(news.image_path);
-      updateData.image_path = `/uploads/images/${req.file.filename}`;
+      if (news.image_path) await deleteCloudinaryResource(news.image_path, 'image');
+      updateData.image_path = req.file.path;
     }
 
     await news.update(updateData);
@@ -689,7 +701,7 @@ export const deleteNews = async (req, res, next) => {
     const news = await News.findByPk(id);
     if (!news) return res.status(404).json({ error: 'News not found' });
 
-    if (news.image_path) deleteFile(news.image_path);
+    if (news.image_path) await deleteCloudinaryResource(news.image_path, 'image');
     await news.destroy();
     res.json({ data: { message: 'News deleted successfully' } });
   } catch (error) { next(error); }
@@ -716,7 +728,7 @@ export const createEvent = async (req, res, next) => {
       venue,
       description,
       link: link || null,
-      banner_path: req.file ? `/uploads/images/${req.file.filename}` : null,
+      banner_path: req.file ? req.file.path : null,
       isPublished: isPublished === undefined ? true : isPublished
     });
     res.status(201).json({ data: event });
@@ -731,8 +743,8 @@ export const updateEvent = async (req, res, next) => {
 
     const updateData = { ...req.body };
     if (req.file) {
-      if (event.banner_path) deleteFile(event.banner_path);
-      updateData.banner_path = `/uploads/images/${req.file.filename}`;
+      if (event.banner_path) await deleteCloudinaryResource(event.banner_path, 'image');
+      updateData.banner_path = req.file.path;
     }
 
     await event.update(updateData);
@@ -746,7 +758,7 @@ export const deleteEvent = async (req, res, next) => {
     const event = await Event.findByPk(id);
     if (!event) return res.status(404).json({ error: 'Event not found' });
 
-    if (event.banner_path) deleteFile(event.banner_path);
+    if (event.banner_path) await deleteCloudinaryResource(event.banner_path, 'image');
     await event.destroy();
     res.json({ data: { message: 'Event deleted successfully' } });
   } catch (error) { next(error); }
@@ -771,7 +783,7 @@ export const createAchievement = async (req, res, next) => {
       students,
       description,
       link: link || null,
-      image_path: req.file ? `/uploads/images/${req.file.filename}` : null,
+      image_path: req.file ? req.file.path : null,
       isPublished: isPublished === undefined ? true : isPublished
     });
     res.status(201).json({ data: achievement });
@@ -786,8 +798,8 @@ export const updateAchievement = async (req, res, next) => {
 
     const updateData = { ...req.body };
     if (req.file) {
-      if (achievement.image_path) deleteFile(achievement.image_path);
-      updateData.image_path = `/uploads/images/${req.file.filename}`;
+      if (achievement.image_path) await deleteCloudinaryResource(achievement.image_path, 'image');
+      updateData.image_path = req.file.path;
     }
 
     await achievement.update(updateData);
@@ -801,7 +813,7 @@ export const deleteAchievement = async (req, res, next) => {
     const achievement = await Achievement.findByPk(id);
     if (!achievement) return res.status(404).json({ error: 'Achievement not found' });
 
-    if (achievement.image_path) deleteFile(achievement.image_path);
+    if (achievement.image_path) await deleteCloudinaryResource(achievement.image_path, 'image');
     await achievement.destroy();
     res.json({ data: { message: 'Achievement deleted successfully' } });
   } catch (error) { next(error); }
@@ -825,7 +837,7 @@ export const createNewsletter = async (req, res, next) => {
       title,
       issueDate,
       description,
-      pdf_path: `/uploads/pdfs/${req.file.filename}`
+      pdf_path: req.file ? req.file.path : null
     });
     res.status(201).json({ data: newsletter });
   } catch (error) { next(error); }
@@ -839,8 +851,8 @@ export const updateNewsletter = async (req, res, next) => {
 
     const updateData = { ...req.body };
     if (req.file) {
-      if (newsletter.pdf_path) deleteFile(newsletter.pdf_path);
-      updateData.pdf_path = `/uploads/pdfs/${req.file.filename}`;
+      if (newsletter.pdf_path) await deleteCloudinaryResource(newsletter.pdf_path, 'raw');
+      updateData.pdf_path = req.file.path;
     }
 
     await newsletter.update(updateData);
@@ -854,7 +866,7 @@ export const deleteNewsletter = async (req, res, next) => {
     const newsletter = await Newsletter.findByPk(id);
     if (!newsletter) return res.status(404).json({ error: 'Newsletter not found' });
 
-    if (newsletter.pdf_path) deleteFile(newsletter.pdf_path);
+    if (newsletter.pdf_path) await deleteCloudinaryResource(newsletter.pdf_path, 'raw');
     await newsletter.destroy();
     res.json({ data: { message: 'Newsletter deleted successfully' } });
   } catch (error) { next(error); }
@@ -913,9 +925,7 @@ export const getAllInfoBlocks = async (req, res, next) => {
 export const createInfoBlock = async (req, res, next) => {
   try {
     const { key, title, body } = req.body;
-    const media_path = req.file
-      ? `/uploads/${req.file.mimetype.includes('pdf') ? 'pdfs' : 'images'}/${req.file.filename}`
-      : null;
+    const media_path = req.file ? req.file.path : null;
 
     const block = await InfoBlock.create({ key, title, body, media_path });
     res.status(201).json({ data: block });
@@ -930,8 +940,12 @@ export const updateInfoBlock = async (req, res, next) => {
 
     const updateData = { ...req.body };
     if (req.file) {
-      if (block.media_path) deleteFile(block.media_path);
-      updateData.media_path = `/uploads/${req.file.mimetype.includes('pdf') ? 'pdfs' : 'images'}/${req.file.filename}`;
+      if (block.media_path) {
+        // resource_type depends on whether it was a pdf or image; best-effort try both
+        await deleteCloudinaryResource(block.media_path, 'raw');
+        await deleteCloudinaryResource(block.media_path, 'image');
+      }
+      updateData.media_path = req.file.path;
     }
 
     await block.update(updateData);
@@ -945,7 +959,10 @@ export const deleteInfoBlock = async (req, res, next) => {
     const block = await InfoBlock.findByPk(id);
     if (!block) return res.status(404).json({ error: 'Info block not found' });
 
-    if (block.media_path) deleteFile(block.media_path);
+    if (block.media_path) {
+      await deleteCloudinaryResource(block.media_path, 'raw');
+      await deleteCloudinaryResource(block.media_path, 'image');
+    }
     await block.destroy();
     res.json({ data: { message: 'Info block deleted successfully' } });
   } catch (error) { next(error); }
@@ -964,7 +981,7 @@ export const getAllResearch = async (req, res, next) => {
 export const createResearch = async (req, res, next) => {
   try {
     const researchData = { ...req.body };
-    if (req.file) researchData.image_path = `/uploads/images/${req.file.filename}`;
+    if (req.file) researchData.image_path = req.file.path;
     const research = await Research.create(researchData);
     res.status(201).json({ data: research });
   } catch (error) { next(error); }
@@ -976,8 +993,8 @@ export const updateResearch = async (req, res, next) => {
     if (!research) return res.status(404).json({ error: 'Research not found' });
     const updateData = { ...req.body };
     if (req.file) {
-      if (research.image_path) deleteFile(research.image_path);
-      updateData.image_path = `/uploads/images/${req.file.filename}`;
+      if (research.image_path) await deleteCloudinaryResource(research.image_path, 'image');
+      updateData.image_path = req.file.path;
     }
     await research.update(updateData);
     res.json({ data: research });
@@ -988,7 +1005,7 @@ export const deleteResearch = async (req, res, next) => {
   try {
     const research = await Research.findByPk(req.params.id);
     if (!research) return res.status(404).json({ error: 'Research not found' });
-    if (research.image_path) deleteFile(research.image_path);
+    if (research.image_path) await deleteCloudinaryResource(research.image_path, 'image');
     await research.destroy();
     res.json({ data: { message: 'Research deleted successfully' } });
   } catch (error) { next(error); }
@@ -1007,7 +1024,7 @@ export const getAllFacilities = async (req, res, next) => {
 export const createFacility = async (req, res, next) => {
   try {
     const facilityData = { ...req.body };
-    if (req.file) facilityData.image_path = `/uploads/images/${req.file.filename}`;
+    if (req.file) facilityData.image_path = req.file.path;
     const facility = await Facility.create(facilityData);
     res.status(201).json({ data: facility });
   } catch (error) { next(error); }
@@ -1019,8 +1036,8 @@ export const updateFacility = async (req, res, next) => {
     if (!facility) return res.status(404).json({ error: 'Facility not found' });
     const updateData = { ...req.body };
     if (req.file) {
-      if (facility.image_path) deleteFile(facility.image_path);
-      updateData.image_path = `/uploads/images/${req.file.filename}`;
+      if (facility.image_path) await deleteCloudinaryResource(facility.image_path, 'image');
+      updateData.image_path = req.file.path;
     }
     await facility.update(updateData);
     res.json({ data: facility });
@@ -1031,7 +1048,7 @@ export const deleteFacility = async (req, res, next) => {
   try {
     const facility = await Facility.findByPk(req.params.id);
     if (!facility) return res.status(404).json({ error: 'Facility not found' });
-    if (facility.image_path) deleteFile(facility.image_path);
+    if (facility.image_path) await deleteCloudinaryResource(facility.image_path, 'image');
     await facility.destroy();
     res.json({ data: { message: 'Facility deleted successfully' } });
   } catch (error) { next(error); }

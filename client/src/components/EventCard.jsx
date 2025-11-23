@@ -1,5 +1,4 @@
 import { motion } from 'framer-motion';
-import { getImageUrl } from '../utils/imageUtils';
 
 const EventCard = ({ event }) => {
   const formatDate = (dateString) =>
@@ -32,13 +31,14 @@ const EventCard = ({ event }) => {
       {event.banner_path && (
         <div className="relative aspect-video overflow-hidden bg-gray-100">
           <motion.img
-            src={getImageUrl(event.banner_path)}
+            src={event.banner_path}  // ✅ Cloudinary direct URL
             alt={event.title || 'Event banner'}
             className="w-full h-full object-cover"
             whileHover={{ scale: 1.05 }}
             transition={{ duration: 0.25 }}
             loading="lazy"
           />
+
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
           {/* Status */}
@@ -54,7 +54,7 @@ const EventCard = ({ event }) => {
 
       <div className="p-6 space-y-4">
         <div className="flex items-center text-sm text-gray-600">
-          <svg className="w-5 h-5 mr-2 text-[#A6192E]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <svg className="w-5 h-5 mr-2 text-[#A6192E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
@@ -71,7 +71,7 @@ const EventCard = ({ event }) => {
 
         {event.venue && (
           <div className="flex items-center text-sm text-gray-600">
-            <svg className="w-5 h-5 mr-2 text-[#A6192E]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <svg className="w-5 h-5 mr-2 text-[#A6192E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -81,21 +81,23 @@ const EventCard = ({ event }) => {
           </div>
         )}
 
-        {event.description && <p className="text-gray-600 text-sm line-clamp-3">{event.description}</p>}
+        {event.description && (
+          <p className="text-gray-600 text-sm line-clamp-3">{event.description}</p>
+        )}
 
         {event.link && (
           <motion.a
             href={event.link}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center text-[#A6192E] font-medium text-sm hover:text-[#7D0F22] group/link focus:outline-none focus:ring-2 focus:ring-[#A6192E]/30 rounded"
+            className="inline-flex items-center text-[#A6192E] font-medium text-sm hover:text-[#7D0F22]"
             whileHover={{ x: 5 }}
             transition={{ type: 'spring', stiffness: 450, damping: 18 }}
-            aria-label={isUpcoming ? 'Register for event' : 'Learn more about event'}
           >
             {isUpcoming ? 'Register Now' : 'Learn More'}
-            <svg className="w-4 h-4 ml-1 transition-transform group-hover/link:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M13 7l5 5m0 0l-5 5m5-5H6" />
             </svg>
           </motion.a>
         )}
@@ -107,27 +109,5 @@ const EventCard = ({ event }) => {
     </motion.div>
   );
 };
-
-// Skeleton
-export const EventCardSkeleton = () => (
-  <div className="rounded-xl overflow-hidden bg-white border border-gray-100 shadow-sm">
-    <div className="aspect-video bg-gray-200 animate-pulse" />
-    <div className="p-6 space-y-4">
-      <div className="flex items-center">
-        <div className="w-5 h-5 bg-gray-200 rounded-full animate-pulse mr-2" />
-        <div className="h-4 bg-gray-200 rounded animate-pulse w-1/3" />
-      </div>
-      <div className="h-6 bg-gray-200 rounded animate-pulse w-3/4" />
-      <div className="flex items-center">
-        <div className="w-5 h-5 bg-gray-200 rounded-full animate-pulse mr-2" />
-        <div className="h-4 bg-gray-200 rounded animate-pulse w-1/4" />
-      </div>
-      <div className="space-y-2">
-        <div className="h-4 bg-gray-200 rounded animate-pulse" />
-        <div className="h-4 bg-gray-200 rounded animate-pulse w-5/6" />
-      </div>
-    </div>
-  </div>
-);
 
 export default EventCard;
