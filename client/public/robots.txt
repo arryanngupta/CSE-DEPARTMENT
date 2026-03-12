@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://cse.lnmiit.ac.in/sitemap.xml
+Host: https://cse.lnmiit.ac.in

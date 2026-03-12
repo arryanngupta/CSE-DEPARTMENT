@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { adminAPI } from '../../lib/api.js';
+import { useState, useEffect } from "react";
+import { adminAPI } from "../../lib/api.js";
 
 const PeopleManagement = () => {
   const [people, setPeople] = useState([]);
@@ -9,22 +9,24 @@ const PeopleManagement = () => {
 
   const emptyForm = {
     name: "",
+    person_type: "Faculty",
     designation: "",
     email: "",
     phone: "",
     department: "Computer Science & Engineering",
     webpage: "",
+    summary: "",
     research_areas: "",
     joining_date: "",
     bio: "",
-    education: "",
-    publications: "",
-    workshops: "",
-    order: 0
+    order: 0,
+    profile_sections: []
   };
 
   const [formData, setFormData] = useState(emptyForm);
   const [photoFile, setPhotoFile] = useState(null);
+  const [jsonText, setJsonText] = useState("[]");
+  const [jsonError, setJsonError] = useState("");
 
   useEffect(() => {
     fetchPeople();
@@ -32,10 +34,11 @@ const PeopleManagement = () => {
 
   const fetchPeople = async () => {
     try {
-      const response = await adminAPI.getPeople();
-      setPeople(response.data.data);
-    } catch (error) {
-      alert("Failed to fetch faculty members");
+      const res = await adminAPI.getPeople();
+      setPeople(res.data.data);
+    } catch (err) {
+      console.error("Fetch error:", err);
+      alert("Failed to fetch people");
     } finally {
       setLoading(false);
     }
@@ -44,9 +47,23 @@ const PeopleManagement = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (jsonError) {
+      alert("Fix JSON error first");
+      return;
+    }
+
     const data = new FormData();
-    Object.keys(formData).forEach((key) => {
-      data.append(key, formData[key]);
+
+    const profileSections = Array.isArray(formData.profile_sections)
+      ? formData.profile_sections
+      : [];
+
+    Object.entries(formData).forEach(([key, value]) => {
+      if (key === "profile_sections") {
+        data.append(key, JSON.stringify(profileSections));
+      } else {
+        data.append(key, value ?? "");
+      }
     });
 
     if (photoFile) data.append("photo", photoFile);
@@ -54,16 +71,17 @@ const PeopleManagement = () => {
     try {
       if (editingPerson) {
         await adminAPI.updatePerson(editingPerson.id, data);
-        alert("Faculty member updated successfully!");
+        alert("Person updated successfully");
       } else {
         await adminAPI.createPerson(data);
-        alert("Faculty member created successfully!");
+        alert("Person created successfully");
       }
 
-      fetchPeople();
+      await fetchPeople();
       closeModal();
     } catch (error) {
-      alert("Failed to save faculty member");
+      console.error("Save error:", error);
+      alert("Failed to save person");
     }
   };
 
@@ -72,10 +90,10 @@ const PeopleManagement = () => {
 
     try {
       await adminAPI.deletePerson(id);
-      alert("Deleted successfully");
-      fetchPeople();
-    } catch {
-      alert("Failed to delete");
+      await fetchPeople();
+    } catch (err) {
+      console.error("Delete error:", err);
+      alert("Delete failed");
     }
   };
 
@@ -83,28 +101,36 @@ const PeopleManagement = () => {
     if (person) {
       setEditingPerson(person);
 
+      let sections = [];
+
+      if (person.profile_sections) {
+        if (typeof person.profile_sections === "string") {
+          try {
+            sections = JSON.parse(person.profile_sections);
+          } catch {
+            sections = [];
+          }
+        } else if (Array.isArray(person.profile_sections)) {
+          sections = person.profile_sections;
+        }
+      }
+
       setFormData({
-        name: person.name,
-        designation: person.designation,
-        email: person.email || "",
-        phone: person.phone || "",
-        department: person.department || "Computer Science & Engineering",
-        webpage: person.webpage || "",
-        research_areas: person.research_areas || "",
-        joining_date: person.joining_date ? person.joining_date.split("T")[0] : "",
-        bio: person.bio || "",
-        education: person.education ? JSON.stringify(person.education, null, 2) : "",
-        publications: person.publications ? JSON.stringify(person.publications, null, 2) : "",
-        workshops: person.workshops ? JSON.stringify(person.workshops, null, 2) : "",
-        order: person.order ?? 0
+        ...emptyForm,
+        ...person,
+        joining_date: person.joining_date?.split("T")[0] || "",
+        profile_sections: sections
       });
 
+      setJsonText(JSON.stringify(sections, null, 2));
     } else {
       setEditingPerson(null);
       setFormData(emptyForm);
+      setJsonText("[]");
     }
 
     setPhotoFile(null);
+    setJsonError("");
     setShowModal(true);
   };
 
@@ -113,135 +139,261 @@ const PeopleManagement = () => {
     setEditingPerson(null);
     setFormData(emptyForm);
     setPhotoFile(null);
+    setJsonText("[]");
+    setJsonError("");
+  };
+
+  const handleJsonChange = (value) => {
+    setJsonText(value);
+
+    try {
+      const parsed = JSON.parse(value);
+      setFormData({ ...formData, profile_sections: parsed });
+      setJsonError("");
+    } catch (e) {
+      setJsonError("Invalid JSON");
+    }
+  };
+
+  const getSectionsCount = (person) => {
+    if (!person.profile_sections) return 0;
+
+    if (typeof person.profile_sections === "string") {
+      try {
+        const parsed = JSON.parse(person.profile_sections);
+        return parsed.length || 0;
+      } catch {
+        return 0;
+      }
+    }
+
+    if (Array.isArray(person.profile_sections)) {
+      return person.profile_sections.length;
+    }
+
+    return 0;
   };
 
   if (loading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-lnmiit-red"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-lnmiit-red" />
       </div>
     );
   }
 
   return (
     <div>
+
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Faculty Members</h1>
-        <button onClick={() => openModal()} className="btn-primary">Add Faculty Member</button>
+        <h1 className="text-3xl font-bold">People Management</h1>
+
+        <button onClick={() => openModal()} className="btn-primary">
+          Add Person
+        </button>
       </div>
 
-      <div className="bg-white rounded-lg shadow">
+      <div className="bg-white rounded-lg shadow overflow-x-auto">
         <table className="w-full">
+
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium">Photo</th>
-              <th className="px-6 py-3 text-left text-xs font-medium">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium">Designation</th>
-              <th className="px-6 py-3 text-left text-xs font-medium">Email</th>
-              <th className="px-6 py-3 text-left text-xs font-medium">Actions</th>
+
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Photo
+              </th>
+
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Name
+              </th>
+
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Person Type
+              </th>
+
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Designation
+              </th>
+
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Email
+              </th>
+
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Sections
+              </th>
+
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Actions
+              </th>
+
             </tr>
           </thead>
+
           <tbody className="divide-y">
-            {people.map((person) => (
-              <tr key={person.id}>
-                <td className="px-6 py-4">
-                  {person.photo_path ? (
-                    <img src={person.photo_path} className="h-12 w-12 rounded-full object-cover" />
-                  ) : (
-                    <div className="h-12 w-12 rounded-full bg-gray-200"></div>
-                  )}
-                </td>
-                <td className="px-6 py-4">{person.name}</td>
-                <td className="px-6 py-4">{person.designation}</td>
-                <td className="px-6 py-4">{person.email}</td>
-                <td className="px-6 py-4 space-x-2">
-                  <button onClick={() => openModal(person)} className="text-blue-600">Edit</button>
-                  <button onClick={() => handleDelete(person.id)} className="text-red-600">Delete</button>
-                </td>
-              </tr>
-            ))}
+
+            {people.map((person) => {
+
+              const sectionsCount = getSectionsCount(person);
+
+              return (
+                <tr key={person.id}>
+
+                  <td className="px-6 py-4">
+                    {person.photo_path ? (
+                      <img
+                        src={person.photo_path}
+                        alt={person.name}
+                        className="h-12 w-12 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center">
+                        <span className="text-xs">No Photo</span>
+                      </div>
+                    )}
+                  </td>
+
+                  <td className="px-6 py-4">{person.name}</td>
+
+                  <td className="px-6 py-4">{person.person_type}</td>
+
+                  <td className="px-6 py-4">{person.designation}</td>
+
+                  <td className="px-6 py-4">{person.email}</td>
+
+                  <td className="px-6 py-4">
+                    {sectionsCount > 0
+                      ? `${sectionsCount} sections`
+                      : "No sections"}
+                  </td>
+
+                  <td className="px-6 py-4 space-x-2">
+
+                    <button
+                      onClick={() => openModal(person)}
+                      className="text-blue-600"
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      onClick={() => handleDelete(person.id)}
+                      className="text-red-600"
+                    >
+                      Delete
+                    </button>
+
+                  </td>
+
+                </tr>
+              );
+            })}
+
           </tbody>
         </table>
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            
-            <h2 className="text-2xl font-bold mb-4">
-              {editingPerson ? "Edit Faculty Member" : "Add Faculty Member"}
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+
+          <div className="bg-white rounded-lg w-full max-w-2xl p-6">
+
+            <h2 className="text-xl font-bold mb-4">
+              {editingPerson ? "Edit Person" : "Add Person"}
             </h2>
 
             <form onSubmit={handleSubmit} className="space-y-4">
 
-              <Input label="Name *" value={formData.name} onChange={(v) => setFormData({...formData, name: v})} />
-              <Input label="Designation *" value={formData.designation} onChange={(v) => setFormData({...formData, designation: v})} />
-
-              <Input label="Email" value={formData.email} onChange={(v) => setFormData({...formData, email: v})} />
-              <Input label="Phone" value={formData.phone} onChange={(v) => setFormData({...formData, phone: v})} />
+              <Input
+                label="Name"
+                value={formData.name}
+                onChange={(v) => setFormData({ ...formData, name: v })}
+                required
+              />
 
               <div>
-                <label className="block mb-2">Department</label>
+                <label className="block text-sm font-medium mb-1">
+                  Person Type
+                </label>
+
                 <select
-                  className="input-field"
-                  value={formData.department}
-                  onChange={(e) => setFormData({...formData, department: e.target.value})}
+                  value={formData.person_type}
+                  onChange={(e) =>
+                    setFormData({ ...formData, person_type: e.target.value })
+                  }
+                  className="w-full border rounded px-3 py-2"
                 >
-                  <option>Computer Science & Engineering</option>
-                  <option>Electronics & Communications Engineering</option>
-                  <option>Mechanical Engineering</option>
-                  <option>Mathematics</option>
-                  <option>Physics</option>
+                  <option value="Faculty">Faculty</option>
+                  <option value="Staff">Staff</option>
+                  <option value="Research Scholar">Research Scholar</option>
+                  <option value="Alumni">Prominent Alumni</option>
                 </select>
               </div>
 
-              <Input label="Webpage URL" value={formData.webpage} onChange={(v) => setFormData({...formData, webpage: v})} />
+              <Input
+                label="Designation"
+                value={formData.designation}
+                onChange={(v) =>
+                  setFormData({ ...formData, designation: v })
+                }
+              />
 
-              <Textarea label="Research Areas" value={formData.research_areas} onChange={(v) => setFormData({...formData, research_areas: v})} />
+              <Input
+                label="Email"
+                value={formData.email}
+                onChange={(v) =>
+                  setFormData({ ...formData, email: v })
+                }
+              />
 
-              <Input type="date" label="Date of Joining" value={formData.joining_date} onChange={(v) => setFormData({...formData, joining_date: v})} />
+              <Input
+                label="Phone"
+                value={formData.phone}
+                onChange={(v) =>
+                  setFormData({ ...formData, phone: v })
+                }
+              />
 
-              <Textarea label="Biography" value={formData.bio} onChange={(v) => setFormData({...formData, bio: v})} />
+              <Input
+                type="file"
+                label="Photo"
+                onFile={setPhotoFile}
+              />
 
-              <Textarea label="Education (JSON)" value={formData.education} onChange={(v) => setFormData({...formData, education: v})} />
-
-              <Textarea label="Publications (JSON)" value={formData.publications} onChange={(v) => setFormData({...formData, publications: v})} />
-
-              <Textarea label="Workshops (JSON)" value={formData.workshops} onChange={(v) => setFormData({...formData, workshops: v})} />
-
-              <Input type="file" label="Photo" onFile={(f) => setPhotoFile(f)} />
-
-              <Input type="number" label="Order" value={formData.order} onChange={(v) => setFormData({...formData, order: v})} />
-
-              <div className="flex space-x-4 pt-4">
-                <button type="submit" className="btn-primary flex-1">Save</button>
-                <button type="button" onClick={closeModal} className="btn-secondary flex-1">Cancel</button>
-              </div>
+              <button className="bg-blue-600 text-white px-4 py-2 rounded">
+                {editingPerson ? "Update" : "Create"}
+              </button>
 
             </form>
+
           </div>
+
         </div>
       )}
+
     </div>
   );
 };
 
 export default PeopleManagement;
 
-const Input = ({ label, value, onChange, type = "text", onFile }) => (
+const Input = ({ label, value, onChange, type = "text", onFile, required }) => (
   <div>
-    <label className="block text-sm font-medium mb-2">{label}</label>
-    {type === "file" ? (
-      <input type="file" accept="image/*" onChange={(e) => onFile(e.target.files[0])} className="input-field" />
-    ) : (
-      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} className="input-field" />
-    )}
-  </div>
-);
+    <label className="block text-sm font-medium mb-1">{label}</label>
 
-const Textarea = ({ label, value, onChange }) => (
-  <div>
-    <label className="block text-sm font-medium mb-2">{label}</label>
-    <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={3} className="input-field"></textarea>
+    {type === "file" ? (
+      <input
+        type="file"
+        onChange={(e) => onFile(e.target.files?.[0] || null)}
+      />
+    ) : (
+      <input
+        type={type}
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full border rounded px-3 py-2"
+        required={required}
+      />
+    )}
   </div>
 );

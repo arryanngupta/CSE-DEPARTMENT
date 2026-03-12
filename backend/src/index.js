@@ -6,6 +6,8 @@ import dotenv from 'dotenv';
 import routes from './routes/index.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { sequelize } from './config/database.js';
+import sitemapRoutes from './routes/sitemap.routes.js';
+
 
 dotenv.config();
 
@@ -41,6 +43,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // API Routes
 app.use('/api', routes);
+app.use('/', sitemapRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -55,7 +58,11 @@ const startServer = async () => {
   try {
     await sequelize.authenticate();
     console.log('✓ Database connection established successfully.');
-    
+
+    // 🔥 ADD THIS LINE (RUN ONCE)
+    // await sequelize.sync({ alter: true });
+    // console.log('✓ Database models synced.');
+
     app.listen(PORT, () => {
       console.log(`✓ Server running on port ${PORT}`);
       console.log(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);
@@ -65,5 +72,6 @@ const startServer = async () => {
     process.exit(1);
   }
 };
+
 
 startServer();

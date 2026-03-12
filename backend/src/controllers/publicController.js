@@ -20,11 +20,14 @@ import {
   SectionContent
 } from '../db/models/index.js';
 
+// 🔥 NEW: Faculty profile normalizer
+import { normalizeFacultyProfile } from '../utils/normalizeFacultyProfile.js';
+
 /**
  * Public controllers for the website.
  */
 
-// GET /api/public/sliders
+/* ======================= SLIDERS ======================= */
 export const getSliders = async (req, res, next) => {
   try {
     const sliders = await Slider.findAll({
@@ -39,21 +42,17 @@ export const getSliders = async (req, res, next) => {
   }
 };
 
-// GET /api/public/people
+/* ======================= PEOPLE LIST ======================= */
 export const getPeople = async (req, res, next) => {
   try {
-    const { designation, area, q, page = 1, limit = 20 } = req.query;
+    const { designation,person_type, area, q, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
     const where = {};
 
-    if (designation) {
-      where.designation = { [Op.like]: `%${designation}%` };
-    }
-
-    if (area) {
-      where.research_areas = { [Op.like]: `%${area}%` };
-    }
+    if (designation) where.designation = { [Op.like]: `%${designation}%` };
+    if (person_type) where.person_type = person_type;
+    if (area) where.research_areas = { [Op.like]: `%${area}%` };
 
     if (q) {
       where[Op.or] = [
@@ -84,9 +83,10 @@ export const getPeople = async (req, res, next) => {
   }
 };
 
+/* ======================= FACULTY PROFILE ======================= */
 /**
  * GET /api/public/people/:slug
- * Retrieve a single faculty member by slug for profile page
+ * LNMIIT-style Faculty Profile API
  */
 export const getPersonBySlug = async (req, res, next) => {
   try {
@@ -102,6 +102,7 @@ export const getPersonBySlug = async (req, res, next) => {
         'email',
         'phone',
         'webpage',
+        'summary',
         'photo_path',
         'research_areas',
         'bio',
@@ -110,7 +111,7 @@ export const getPersonBySlug = async (req, res, next) => {
         'education',
         'publications',
         'workshops',
-        'order'
+        'profile_sections'
       ]
     });
 
@@ -118,32 +119,16 @@ export const getPersonBySlug = async (req, res, next) => {
       return res.status(404).json({ error: 'Faculty member not found' });
     }
 
-    // Clean and normalise response
-    const cleanPerson = {
-      id: person.id,
-      name: person.name,
-      slug: person.slug,
-      designation: person.designation,
-      email: person.email,
-      phone: person.phone,
-      webpage: person.webpage,
-      photo_path: person.photo_path,
-      research_areas: person.research_areas,
-      bio: person.bio,
-      joining_date: person.joining_date,
-      department: person.department,
-      education: person.education || [],
-      publications: person.publications || [],
-      workshops: person.workshops || []
-    };
+    // NORMALIZE to frontend-ready LNMIIT schema
+    const profile = normalizeFacultyProfile(person);
 
-    res.json({ data: cleanPerson });
+    res.json({ data: profile });
   } catch (error) {
     next(error);
   }
 };
 
-// GET /api/public/programs
+/* ======================= PROGRAMS ======================= */
 export const getPrograms = async (req, res, next) => {
   try {
     const programs = await Program.findAll({
@@ -152,7 +137,17 @@ export const getPrograms = async (req, res, next) => {
         ['display_order', 'ASC'],
         ['name', 'ASC']
       ],
-      attributes: ['id', 'name', 'short_name', 'level', 'description', 'overview', 'duration', 'total_credits', 'curriculum_pdf_path']
+      attributes: [
+        'id',
+        'name',
+        'short_name',
+        'level',
+        'description',
+        'overview',
+        'duration',
+        'total_credits',
+        'curriculum_pdf_path'
+      ]
     });
 
     res.json({ data: programs });
@@ -161,7 +156,7 @@ export const getPrograms = async (req, res, next) => {
   }
 };
 
-// GET /api/public/programs/:id
+/* ======================= PROGRAM DETAILS ======================= */
 export const getProgramDetails = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -207,7 +202,6 @@ export const getProgramDetails = async (req, res, next) => {
       return res.status(404).json({ error: 'Program not found' });
     }
 
-    // CLEAN SERIALIZER - produce a lightweight JSON suitable for frontend
     const cleanProgram = {
       id: program.id,
       name: program.name,
@@ -218,63 +212,32 @@ export const getProgramDetails = async (req, res, next) => {
       duration: program.duration,
       total_credits: program.total_credits,
       curriculum_pdf_path: program.curriculum_pdf_path,
-      sections: (program.sections || [])
-        .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
-        .map((s) => ({
-          id: s.id,
-          title: s.title,
-          section_type: s.section_type,
-          display_order: s.display_order,
-          is_expanded: !!s.is_expanded,
-          content: s.content ? { id: s.content.id, content_html: s.content.content_html } : null,
-          outcomes: (s.outcomes || [])
-            .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
-            .map((o) => ({
-              id: o.id,
-              outcome_code: o.outcome_code,
-              outcome_text: o.outcome_text,
-              display_order: o.display_order
-            })),
-          semesters: (s.semesters || [])
-            .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
-            .map((sem) => ({
-              id: sem.id,
-              semester_number: sem.semester_number,
-              semester_name: sem.semester_name,
-              display_order: sem.display_order,
-              courses: (sem.courses || [])
-                .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
-                .map((c) => ({
-                  id: c.id,
-                  course_name: c.course_name,
-                  course_type: c.course_type,
-                  theory_hours: c.theory_hours,
-                  lab_hours: c.lab_hours,
-                  tutorial_hours: c.tutorial_hours,
-                  practical_hours: c.practical_hours,
-                  credits: c.credits,
-                  display_order: c.display_order
-                }))
-            }))
-        }))
+      sections: (program.sections || []).map(s => ({
+        id: s.id,
+        title: s.title,
+        section_type: s.section_type,
+        display_order: s.display_order,
+        is_expanded: !!s.is_expanded,
+        content: s.content ? s.content.content_html : null,
+        outcomes: s.outcomes || [],
+        semesters: s.semesters || []
+      }))
     };
 
-    return res.json({ data: cleanProgram });
+    res.json({ data: cleanProgram });
   } catch (error) {
     next(error);
   }
 };
 
-// GET /api/public/news
+/* ======================= NEWS / EVENTS / OTHERS ======================= */
+
 export const getNews = async (req, res, next) => {
   try {
     const { published = '1', page = 1, limit = 10 } = req.query;
     const offset = (page - 1) * limit;
 
-    const where = {};
-    if (published === '1') {
-      where.isPublished = true;
-    }
+    const where = published === '1' ? { isPublished: true } : {};
 
     const { count, rows } = await News.findAndCountAll({
       where,
@@ -283,99 +246,97 @@ export const getNews = async (req, res, next) => {
       offset: parseInt(offset, 10)
     });
 
-    res.json({
-      data: rows,
-      meta: {
-        total: count,
-        page: parseInt(page, 10),
-        limit: parseInt(limit, 10),
-        totalPages: Math.ceil(count / limit)
-      }
-    });
+    res.json({ data: rows, meta: { total: count } });
   } catch (error) {
     next(error);
   }
 };
 
-// GET /api/public/news/:id
 export const getNewsById = async (req, res, next) => {
   try {
-    const { id } = req.params;
     const news = await News.findOne({
-      where: { id, isPublished: true }
+      where: { id: req.params.id, isPublished: true }
     });
 
-    if (!news) {
-      return res.status(404).json({ error: 'News not found' });
-    }
-
+    if (!news) return res.status(404).json({ error: 'News not found' });
     res.json({ data: news });
   } catch (error) {
     next(error);
   }
 };
 
-// GET /api/public/events
 export const getEvents = async (req, res, next) => {
   try {
-    const { upcoming = '1', page = 1, limit = 10 } = req.query;
+    const { q, page = 1, limit = 6 } = req.query;
     const offset = (page - 1) * limit;
 
     const where = { isPublished: true };
 
-    if (upcoming === '1') {
-      where.startsAt = { [Op.gte]: new Date() };
+    if (q) {
+      where[Op.or] = [
+        { title: { [Op.like]: `%${q}%` } },
+        { description: { [Op.like]: `%${q}%` } }
+      ];
     }
 
     const { count, rows } = await Event.findAndCountAll({
       where,
-      order: [['startsAt', upcoming === '1' ? 'ASC' : 'DESC']],
-      limit: parseInt(limit, 10),
-      offset: parseInt(offset, 10)
+      order: [["startsAt", "DESC"]],
+      limit: +limit,
+      offset
     });
 
     res.json({
       data: rows,
       meta: {
         total: count,
-        page: parseInt(page, 10),
-        limit: parseInt(limit, 10),
+        page: +page,
         totalPages: Math.ceil(count / limit)
       }
     });
+  } catch (e) {
+    next(e);
+  }
+};
+
+export const getEventById = async (req, res, next) => {
+  try {
+    const event = await Event.findOne({
+      where: {
+        id: req.params.id,
+        isPublished: true,
+      },
+    });
+
+    if (!event) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    res.json({ data: event });
   } catch (error) {
     next(error);
   }
 };
 
-// GET /api/public/achievements
 export const getAchievements = async (req, res, next) => {
   try {
-    const { page = 1, limit = 12 } = req.query;
-    const offset = (page - 1) * limit;
+    const { category } = req.query;
 
-    const { count, rows } = await Achievement.findAndCountAll({
-      where: { isPublished: true },
-      order: [['createdAt', 'DESC']],
-      limit: parseInt(limit, 10),
-      offset: parseInt(offset, 10)
+    const where = { isPublished: true };
+    if (category) where.category = category;
+
+    const achievements = await Achievement.findAll({
+      where,
+      order: [['createdAt', 'DESC']]
     });
 
-    res.json({
-      data: rows,
-      meta: {
-        total: count,
-        page: parseInt(page, 10),
-        limit: parseInt(limit, 10),
-        totalPages: Math.ceil(count / limit)
-      }
-    });
+    res.json({ data: achievements });
   } catch (error) {
     next(error);
   }
 };
 
-// GET /api/public/newsletters
+
 export const getNewsletters = async (req, res, next) => {
   try {
     const newsletters = await Newsletter.findAll({
@@ -388,7 +349,6 @@ export const getNewsletters = async (req, res, next) => {
   }
 };
 
-// GET /api/public/directory
 export const getDirectory = async (req, res, next) => {
   try {
     const directory = await DirectoryEntry.findAll({
@@ -401,50 +361,26 @@ export const getDirectory = async (req, res, next) => {
   }
 };
 
-// GET /api/public/info/:key
 export const getInfoBlock = async (req, res, next) => {
   try {
-    const { key } = req.params;
     const infoBlock = await InfoBlock.findOne({
-      where: { key }
+      where: { key: req.params.key }
     });
 
-    if (!infoBlock) {
-      return res.status(404).json({ error: 'Info block not found' });
-    }
-
+    if (!infoBlock) return res.status(404).json({ error: 'Info block not found' });
     res.json({ data: infoBlock });
   } catch (error) {
     next(error);
   }
 };
 
-// RESEARCH (public)
 export const getResearch = async (req, res, next) => {
   try {
-    const { category, featured = '0', page = 1, limit = 10 } = req.query;
-    const offset = (page - 1) * limit;
-
-    const where = {};
-    if (category) where.category = category;
-    if (featured === '1') where.is_featured = true;
-
-    const { count, rows } = await Research.findAndCountAll({
-      where,
-      order: [['display_order', 'ASC']],
-      limit: parseInt(limit, 10),
-      offset: parseInt(offset, 10)
+    const research = await Research.findAll({
+      order: [['display_order', 'ASC']]
     });
 
-    res.json({
-      data: rows,
-      meta: {
-        total: count,
-        page: parseInt(page, 10),
-        limit: parseInt(limit, 10),
-        totalPages: Math.ceil(count / limit)
-      }
-    });
+    res.json({ data: research });
   } catch (error) {
     next(error);
   }
@@ -460,32 +396,14 @@ export const getResearchById = async (req, res, next) => {
   }
 };
 
-// FACILITIES (public)
 export const getFacilities = async (req, res, next) => {
   try {
-    const { category, active = '1', page = 1, limit = 12 } = req.query;
-    const offset = (page - 1) * limit;
-
-    const where = {};
-    if (category) where.category = category;
-    if (active === '1') where.is_active = true;
-
-    const { count, rows } = await Facility.findAndCountAll({
-      where,
-      order: [['display_order', 'ASC']],
-      limit: parseInt(limit, 10),
-      offset: parseInt(offset, 10)
+    const facilities = await Facility.findAll({
+      where: { is_active: true },
+      order: [['display_order', 'ASC']]
     });
 
-    res.json({
-      data: rows,
-      meta: {
-        total: count,
-        page: parseInt(page, 10),
-        limit: parseInt(limit, 10),
-        totalPages: Math.ceil(count / limit)
-      }
-    });
+    res.json({ data: facilities });
   } catch (error) {
     next(error);
   }

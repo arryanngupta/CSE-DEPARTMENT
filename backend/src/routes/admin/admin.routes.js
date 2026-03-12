@@ -25,11 +25,6 @@ import {
 
 const router = express.Router();
 
-/* ----------- PUBLIC ROUTES (no auth needed) ----------- */
-router.post('/login', login);
-router.get('/me', authenticate, getMe);
-
-/* ----------- PROTECTED ROUTES -------------------------- */
 router.use(authenticate);
 router.use(requireAdmin);
 
@@ -118,5 +113,24 @@ router.get('/facilities', getAllFacilities);
 router.post('/facilities', uploadLimiter, uploadImage('image'), createFacility);
 router.put('/facilities/:id', uploadLimiter, uploadImage('image'), updateFacility);
 router.delete('/facilities/:id', deleteFacility);
+
+router.post(
+  '/upload-editor-image',
+  uploadLimiter,
+  uploadImage('image'),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'Image required' });
+      }
+
+      res.json({
+        url: req.file.path
+      });
+    } catch (err) {
+      res.status(500).json({ error: 'Upload failed' });
+    }
+  }
+);
 
 export default router;

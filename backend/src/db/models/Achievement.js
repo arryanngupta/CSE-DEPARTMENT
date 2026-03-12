@@ -11,10 +11,14 @@ const Achievement = sequelize.define('Achievement', {
     type: DataTypes.STRING,
     allowNull: false
   },
+  category: {
+    type: DataTypes.ENUM('student', 'faculty'),
+    allowNull: false,
+    defaultValue: 'student'
+  },
   students: {
     type: DataTypes.TEXT,
-    allowNull: true,
-    comment: 'Comma-separated student names'
+    allowNull: true
   },
   description: {
     type: DataTypes.TEXT,

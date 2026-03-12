@@ -1,142 +1,184 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import axios from "axios";
-import { motion, AnimatePresence } from "framer-motion";
+import { publicAPI } from "../lib/api.js";
 import Loading from "../components/Loading.jsx";
-import { getImageUrl } from "../utils/imageUtils.js";
 
-const Research = () => {
+export default function Research() {
   const [research, setResearch] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchParams] = useSearchParams();
-  const typeParam = searchParams.get("type") || "All";
-  const [category, setCategory] = useState(typeParam);
+
+  const typeParam = searchParams.get("type"); 
+  // Publication | Project | Patent | Collaboration | null
 
   useEffect(() => {
-    fetchResearch();
-  }, [category]);
+    loadResearch();
+  }, []);
 
-  useEffect(() => {
-    // Update category when query changes
-    setCategory(typeParam);
-  }, [typeParam]);
-
-  const fetchResearch = async () => {
+  async function loadResearch() {
     try {
       setLoading(true);
-      const params = {};
-      if (category !== "All") params.category = category;
-      const response = await axios.get("/api/public/research", { params });
-      setResearch(response.data.data || []);
-    } catch (error) {
-      console.error("Error fetching research:", error);
+      const res = await publicAPI.getResearch();
+      setResearch(res.data?.data || []);
+    } catch (e) {
+      console.error("Failed to load research", e);
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const categories = ["All", "Area", "Project", "Publication", "Patent"];
+  /* ===== GROUP DATA ===== */
+  const publications = useMemo(
+    () => research.filter(r => r.category === "Publication"),
+    [research]
+  );
+
+  const projects = useMemo(
+    () => research.filter(r => r.category === "Project"),
+    [research]
+  );
+
+  const patents = useMemo(
+    () => research.filter(r => r.category === "Patent"),
+    [research]
+  );
+
+  const collaborations = useMemo(
+    () => research.filter(r => r.category === "Collaboration"),
+    [research]
+  );
+
+  if (loading) return <Loading />;
 
   return (
-    <div className="container mx-auto px-4 py-12">
-      <div className="text-center mb-12">
-        <h1 className="text-4xl md:text-5xl font-bold text-[#A6192E] mb-3">
-          Research
-        </h1>
-        <div className="h-1 w-24 bg-[#A6192E] mx-auto"></div>
-        <p className="text-gray-600 mt-4 text-sm md:text-base max-w-2xl mx-auto">
-          Explore our department’s cutting-edge research across diverse areas —
-          from innovation-driven projects to impactful publications and patents.
-        </p>
-      </div>
+    <div className="bg-white px-8 py-12">
+      <div className="max-w-6xl mx-auto">
 
-      {/* Category Filters */}
-      <div className="flex flex-wrap justify-center gap-3 mb-10">
-        {categories.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setCategory(cat)}
-            className={`px-5 py-2 rounded-full text-sm font-medium border transition-all duration-300 ${
-              category === cat
-                ? "bg-[#A6192E] text-white border-[#A6192E] shadow-md scale-105"
-                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
-      </div>
-
-      {loading ? (
-        <Loading />
-      ) : research.length > 0 ? (
-        <motion.div
-          layout
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8"
-        >
-          <AnimatePresence>
-            {research.map((item) => (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.4 }}
-                className="bg-white rounded-2xl shadow-md border border-gray-100 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 overflow-hidden"
-              >
-                {item.image_path && (
-                  <img
-                    src={getImageUrl(item.image_path)}
-                    alt={item.title}
-                    className="w-full h-48 object-cover"
-                  />
-                )}
-                <div className="p-5">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    {item.title}
-                  </h3>
-                  {item.category && (
-                    <p className="text-xs uppercase text-[#A6192E] font-medium mb-2 tracking-wide">
-                      {item.category}
-                    </p>
-                  )}
-                  {item.faculty && (
-                    <p className="text-sm text-gray-600 mb-2">
-                      👨‍🏫 <span className="font-medium">{item.faculty}</span>
-                    </p>
-                  )}
-                  {item.funding_agency && (
-                    <p className="text-sm text-gray-500 mb-2">
-                      💰 Funded by: {item.funding_agency}
-                    </p>
-                  )}
-                  {item.description && (
-                    <p className="text-sm text-gray-500 line-clamp-3 mb-3">
-                      {item.description}
-                    </p>
-                  )}
-                  {item.link && (
-                    <a
-                      href={item.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-block text-[#A6192E] hover:underline text-sm font-medium"
-                    >
-                      View More →
-                    </a>
-                  )}
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </motion.div>
-      ) : (
-        <div className="text-center text-gray-500 py-10 text-lg">
-          No research items found in this category.
+        {/* ===== PAGE HEADER ===== */}
+        <div className="text-center mb-16">
+          <h1 className="text-4xl font-bold text-[#A6192E] mb-3">Research</h1>
+          <div className="h-1 w-24 bg-[#A6192E] mx-auto" />
+          <p className="text-gray-600 mt-4 max-w-2xl mx-auto">
+            Explore publications, funded projects, patents and academic collaborations.
+          </p>
         </div>
-      )}
+
+        {/* ================= PUBLICATIONS ================= */}
+        {(!typeParam || typeParam === "Publication") && (
+          <Section title="Research Publications">
+            {publications.length ? (
+              <ul className="space-y-4">
+                {publications.map(p => (
+                  <li key={p.id} className="border-b pb-4">
+                    <div className="font-semibold">{p.title}</div>
+                    <div className="text-sm text-gray-600">
+                      {p.authors} {p.journal && `— ${p.journal}`} {p.year && `(${p.year})`}
+                    </div>
+                    {p.link && (
+                      <a
+                        href={p.link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[#A6192E] text-sm"
+                      >
+                        View Publication →
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : <Empty />}
+          </Section>
+        )}
+
+        {/* ================= PROJECTS ================= */}
+        {(!typeParam || typeParam === "Project") && (
+          <Section title="Research Projects">
+            {projects.length ? (
+              <div className="grid md:grid-cols-2 gap-8">
+                {projects.map(p => (
+                  <div key={p.id} className="border rounded-lg p-5 shadow-sm">
+                    <h3 className="font-semibold mb-2">{p.title}</h3>
+                    <p className="text-sm text-gray-600 mb-2">{p.description}</p>
+                    <div className="text-sm">
+                      {p.faculty && <><strong>PI:</strong> {p.faculty}<br /></>}
+                      {p.funding_agency && <><strong>Funding:</strong> {p.funding_agency}<br /></>}
+                      {p.status && <><strong>Status:</strong> {p.status}</>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : <Empty />}
+          </Section>
+        )}
+
+        {/* ================= PATENTS ================= */}
+        {(!typeParam || typeParam === "Patent") && (
+          <Section title="Patents">
+            {patents.length ? (
+              <div className="overflow-x-auto">
+                <table className="w-full border">
+                  <thead className="bg-[#8B0000] text-white">
+                    <tr>
+                      <th className="p-3 text-left">Title</th>
+                      <th className="p-3 text-left">Inventors</th>
+                      <th className="p-3 text-left">Application No.</th>
+                      <th className="p-3 text-left">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {patents.map(p => (
+                      <tr key={p.id} className="border-t">
+                        <td className="p-3">{p.title}</td>
+                        <td className="p-3">{p.inventors}</td>
+                        <td className="p-3">{p.application_no}</td>
+                        <td className="p-3">{p.patent_status}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : <Empty />}
+          </Section>
+        )}
+
+        {/* ================= COLLABORATIONS ================= */}
+        {(!typeParam || typeParam === "Collaboration") && (
+          <Section title="Collaborations">
+            {collaborations.length ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+                {collaborations.map(c => (
+                  <div key={c.id} className="text-center">
+                    {c.image_path && (
+                      <img
+                        src={c.image_path}
+                        alt={c.collaboration_org}
+                        className="h-20 mx-auto object-contain"
+                      />
+                    )}
+                    <div className="mt-3 font-medium">
+                      {c.collaboration_org}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : <Empty />}
+          </Section>
+        )}
+
+      </div>
     </div>
   );
-};
+}
 
-export default Research;
+/* ===== Helpers ===== */
+const Section = ({ title, children }) => (
+  <section className="mb-20">
+    <h2 className="text-3xl font-serif font-bold mb-8">{title}</h2>
+    {children}
+  </section>
+);
+
+const Empty = () => (
+  <p className="italic text-gray-500">No items available.</p>
+);

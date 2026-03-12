@@ -17,7 +17,7 @@ export default function FacultyCard({ person }) {
           {person.photo_path ? (
             <img
               src={person.photo_path}           // ✅ Cloudinary direct URL
-              alt={person.name || "Faculty Photo"}
+              alt={`${person.name} — ${person.designation || "Faculty"}, Department of Computer Science & Engineering, LNMIIT Jaipur`}
               className="max-h-full max-w-full object-contain"
               loading="lazy"                    // ⭐ Better performance
             />

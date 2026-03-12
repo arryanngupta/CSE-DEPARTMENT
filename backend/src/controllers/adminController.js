@@ -25,6 +25,32 @@ import cloudinary from '../config/cloudinary.js'; // default export from cloudin
  * Helper: parse booleans sent as "true"/"false" or real booleans or missing.
  * If value is undefined, returns undefined (caller can decide default).
  */
+
+/* ==========================
+   SAFE JSON PARSER (ADMIN)
+   ========================== */
+
+const safeJSON = (value, fallback = []) => {
+  if (value === undefined) return fallback; // 👈 undefined ONLY
+
+  if (typeof value === "object") return value;
+
+  if (typeof value === "string") {
+    if (value.trim() === "") return fallback;
+
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  return fallback;
+};
+
+
+
 const parseBool = (v) => {
   if (typeof v === 'boolean') return v;
   if (typeof v === 'string') {
@@ -138,13 +164,16 @@ export const deleteSlider = async (req, res, next) => {
 /* ==========================
    PEOPLE
    ========================== */
+
 export const getAllPeople = async (req, res, next) => {
   try {
     const people = await People.findAll({
       order: [['order', 'ASC'], ['name', 'ASC']]
     });
     res.json({ data: people });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
 
 export const createPerson = async (req, res, next) => {
@@ -152,26 +181,24 @@ export const createPerson = async (req, res, next) => {
     const {
       name,
       designation,
+      person_type,
       email,
       phone,
       webpage,
+      summary,
       research_areas,
       bio,
       joining_date,
       department,
-      education,
-      publications,
-      workshops
+      profile_sections
     } = req.body;
 
     const order = Number(req.body.order) || 0;
 
-    // Generate slug from name
     let slug = generateSlug(name);
-
-    // Ensure unique slug
     let exists = await People.findOne({ where: { slug } });
     let counter = 1;
+
     while (exists) {
       slug = `${generateSlug(name)}-${counter++}`;
       exists = await People.findOne({ where: { slug } });
@@ -181,23 +208,23 @@ export const createPerson = async (req, res, next) => {
       name,
       slug,
       designation,
+      person_type: person_type || "Faculty",
       email,
       phone,
       webpage,
+      summary,
       research_areas,
       bio,
       joining_date: joining_date ? new Date(joining_date) : null,
       department: department || "Computer Science & Engineering",
-      education: education ? JSON.parse(education) : [],
-      publications: publications ? JSON.parse(publications) : [],
-      workshops: workshops ? JSON.parse(workshops) : [],
+      profile_sections: safeJSON(profile_sections, []),
       photo_path: req.file ? req.file.path : null,
       order
     });
 
-    return res.status(201).json({
+    res.status(201).json({
       success: true,
-      message: "Person created successfully",
+      message: "Faculty member created successfully",
       data: person
     });
   } catch (err) {
@@ -209,19 +236,24 @@ export const updatePerson = async (req, res, next) => {
   try {
     const { id } = req.params;
 
+    // 🔍 ADD THESE DEBUG LOGS AT THE START
+    console.log("=== BACKEND UPDATE PERSON ===");
+    console.log("req.body.profile_sections:", req.body.profile_sections);
+    console.log("Type:", typeof req.body.profile_sections);
+
     const {
       name,
       designation,
+      person_type,
       email,
       phone,
       webpage,
+      summary,
       research_areas,
       bio,
       joining_date,
       department,
-      education,
-      publications,
-      workshops
+      profile_sections
     } = req.body;
 
     const order =
@@ -229,7 +261,7 @@ export const updatePerson = async (req, res, next) => {
 
     const person = await People.findByPk(id);
     if (!person) {
-      return res.status(404).json({ error: "Person not found" });
+      return res.status(404).json({ error: "Faculty member not found" });
     }
 
     const updateData = {};
@@ -239,22 +271,15 @@ export const updatePerson = async (req, res, next) => {
 
       if (name !== person.name) {
         let newSlug = generateSlug(name);
-
         let exists = await People.findOne({
-          where: {
-            slug: newSlug,
-            id: { [Op.ne]: id }
-          }
+          where: { slug: newSlug, id: { [Op.ne]: id } }
         });
 
         let counter = 1;
         while (exists) {
           newSlug = `${generateSlug(name)}-${counter++}`;
           exists = await People.findOne({
-            where: {
-              slug: newSlug,
-              id: { [Op.ne]: id }
-            }
+            where: { slug: newSlug, id: { [Op.ne]: id } }
           });
         }
 
@@ -266,39 +291,61 @@ export const updatePerson = async (req, res, next) => {
     if (email !== undefined) updateData.email = email;
     if (phone !== undefined) updateData.phone = phone;
     if (webpage !== undefined) updateData.webpage = webpage;
+    if (summary !== undefined) updateData.summary = summary;
     if (research_areas !== undefined) updateData.research_areas = research_areas;
     if (bio !== undefined) updateData.bio = bio;
 
-    if (joining_date !== undefined)
+    if (joining_date !== undefined) {
       updateData.joining_date = joining_date ? new Date(joining_date) : null;
+    }
 
-    if (department !== undefined)
+    if (department !== undefined) {
       updateData.department = department || "Computer Science & Engineering";
+    }
 
-    if (education !== undefined)
-      updateData.education = education ? JSON.parse(education) : [];
+    if (profile_sections !== undefined) {
+      // 🔍 ADD THESE DEBUG LOGS HERE
+      console.log("profile_sections before safeJSON:", profile_sections);
+      console.log("Type:", typeof profile_sections);
 
-    if (publications !== undefined)
-      updateData.publications = publications ? JSON.parse(publications) : [];
+      const parsedSections = safeJSON(profile_sections, []);
 
-    if (workshops !== undefined)
-      updateData.workshops = workshops ? JSON.parse(workshops) : [];
+      console.log("After safeJSON:", parsedSections);
+      console.log("Is Array:", Array.isArray(parsedSections));
+      console.log("Length:", parsedSections.length);
+
+      updateData.profile_sections = parsedSections;
+    }
 
     if (order !== undefined) updateData.order = order;
 
     if (req.file) {
-      if (person.photo_path) await deleteCloudinaryResource(person.photo_path, 'image');
+      if (person.photo_path) {
+        await deleteCloudinaryResource(person.photo_path, 'image');
+      }
       updateData.photo_path = req.file.path;
     }
 
+    // 🔍 ADD THIS DEBUG LOG BEFORE UPDATE
+    console.log("updateData.profile_sections:", updateData.profile_sections);
+    console.log("About to update person...");
+
     await person.update(updateData);
 
-    return res.json({
+    // 🔥 ADD THIS LINE - THIS IS THE FIX
+    await person.reload();
+
+    // 🔍 ADD THESE DEBUG LOGS AFTER UPDATE
+    console.log("After update - person.profile_sections:", person.profile_sections);
+    console.log("Full person data:", person.toJSON());
+
+    res.json({
       success: true,
-      message: "Person updated successfully",
+      message: "Faculty member updated successfully",
       data: person
     });
   } catch (error) {
+    console.error("Update person error:", error);
     next(error);
   }
 };
@@ -307,14 +354,23 @@ export const deletePerson = async (req, res, next) => {
   try {
     const { id } = req.params;
     const person = await People.findByPk(id);
-    if (!person) return res.status(404).json({ error: 'Person not found' });
 
-    if (person.photo_path) await deleteCloudinaryResource(person.photo_path, 'image');
+    if (!person) {
+      return res.status(404).json({ error: "Faculty member not found" });
+    }
+
+    if (person.photo_path) {
+      await deleteCloudinaryResource(person.photo_path, 'image');
+    }
+
     await person.destroy();
 
-    res.json({ data: { message: 'Person deleted successfully' } });
-  } catch (error) { next(error); }
+    res.json({ data: { message: "Faculty member deleted successfully" } });
+  } catch (error) {
+    next(error);
+  }
 };
+
 
 /* ==========================
    PROGRAMS + SECTIONS + OUTCOMES + SECTION CONTENT
@@ -776,36 +832,63 @@ export const getAllAchievements = async (req, res, next) => {
 
 export const createAchievement = async (req, res, next) => {
   try {
-    const { title, students, description, link } = req.body;
+    const { title, students, description, link, category } = req.body;
+
     const isPublished = parseBool(req.body.isPublished);
+
     const achievement = await Achievement.create({
       title,
+      category: category || 'student',
       students,
       description,
       link: link || null,
       image_path: req.file ? req.file.path : null,
       isPublished: isPublished === undefined ? true : isPublished
     });
+
     res.status(201).json({ data: achievement });
-  } catch (error) { next(error); }
+  } catch (error) {
+    console.error('CREATE ACHIEVEMENT ERROR:', error);
+    next(error);
+  }
 };
+
 
 export const updateAchievement = async (req, res, next) => {
   try {
     const { id } = req.params;
     const achievement = await Achievement.findByPk(id);
-    if (!achievement) return res.status(404).json({ error: 'Achievement not found' });
+    if (!achievement)
+      return res.status(404).json({ error: 'Achievement not found' });
 
-    const updateData = { ...req.body };
+    const updateData = {
+      title: req.body.title,
+      category: req.body.category,
+      students: req.body.students,
+      description: req.body.description,
+      link: req.body.link || null,
+    };
+
+    const isPublished = parseBool(req.body.isPublished);
+    if (isPublished !== undefined) {
+      updateData.isPublished = isPublished;
+    }
+
     if (req.file) {
-      if (achievement.image_path) await deleteCloudinaryResource(achievement.image_path, 'image');
+      if (achievement.image_path) {
+        await deleteCloudinaryResource(achievement.image_path, 'image');
+      }
       updateData.image_path = req.file.path;
     }
 
     await achievement.update(updateData);
     res.json({ data: achievement });
-  } catch (error) { next(error); }
+  } catch (error) {
+    console.error('UPDATE ACHIEVEMENT ERROR:', error);
+    next(error);
+  }
 };
+
 
 export const deleteAchievement = async (req, res, next) => {
   try {
@@ -980,26 +1063,105 @@ export const getAllResearch = async (req, res, next) => {
 
 export const createResearch = async (req, res, next) => {
   try {
-    const researchData = { ...req.body };
-    if (req.file) researchData.image_path = req.file.path;
+    const body = req.body;
+
+    const researchData = {
+      title: body.title,
+      category: body.category,
+
+      description: body.description || null,
+      link: body.link || null,
+      display_order: Number(body.display_order) || 0,
+    };
+
+    /* ===== CATEGORY-SPECIFIC FIELDS ONLY ===== */
+
+    if (body.category === 'Publication') {
+      researchData.authors = body.authors || null;
+      researchData.journal = body.journal || null;
+      researchData.year = body.year || null;
+    }
+
+    if (body.category === 'Project') {
+      researchData.faculty = body.faculty || null;
+      researchData.funding_agency = body.funding_agency || null;
+
+      // ✅ ENUM-SAFE STATUS
+      if (['Ongoing', 'In Progress', 'Completed', 'Published'].includes(body.status)) {
+        researchData.status = body.status;
+      }
+    }
+
+    if (body.category === 'Patent') {
+      researchData.inventors = body.inventors || null;
+      researchData.application_no = body.application_no || null;
+      researchData.patent_status = body.patent_status || null;
+    }
+
+    if (body.category === 'Collaboration') {
+      researchData.collaboration_org = body.collaboration_org || null;
+    }
+
+    if (req.file) {
+      researchData.image_path = req.file.path;
+    }
+
     const research = await Research.create(researchData);
     res.status(201).json({ data: research });
-  } catch (error) { next(error); }
+  } catch (error) {
+    console.error("Create research error:", error);
+    next(error);
+  }
 };
+
+
 
 export const updateResearch = async (req, res, next) => {
   try {
     const research = await Research.findByPk(req.params.id);
     if (!research) return res.status(404).json({ error: 'Research not found' });
-    const updateData = { ...req.body };
+
+    const body = req.body;
+
+    const updateData = {
+      title: body.title,
+      category: body.category,
+      description: body.description || null,
+      link: body.link || null,
+
+      is_featured: body.is_featured === 'true' || body.is_featured === true,
+      display_order: body.display_order ? Number(body.display_order) : 0,
+
+      authors: body.category === 'Publication' ? body.authors : null,
+      journal: body.category === 'Publication' ? body.journal : null,
+      year: body.category === 'Publication' ? body.year : null,
+
+      faculty: body.category === 'Project' ? body.faculty : null,
+      funding_agency: body.category === 'Project' ? body.funding_agency : null,
+      status: body.category === 'Project' ? body.status : null,
+
+      inventors: body.category === 'Patent' ? body.inventors : null,
+      application_no: body.category === 'Patent' ? body.application_no : null,
+      patent_status: body.category === 'Patent' ? body.patent_status : null,
+
+      collaboration_org:
+        body.category === 'Collaboration' ? body.collaboration_org : null,
+    };
+
     if (req.file) {
-      if (research.image_path) await deleteCloudinaryResource(research.image_path, 'image');
+      if (research.image_path)
+        await deleteCloudinaryResource(research.image_path, 'image');
       updateData.image_path = req.file.path;
     }
+
     await research.update(updateData);
     res.json({ data: research });
-  } catch (error) { next(error); }
+  } catch (error) {
+    console.error("Update research error:", error);
+    next(error);
+  }
 };
+
 
 export const deleteResearch = async (req, res, next) => {
   try {

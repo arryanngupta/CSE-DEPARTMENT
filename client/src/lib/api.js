@@ -54,21 +54,32 @@ export const authAPI = {
 // PUBLIC APIs (named export)
 // ========================
 export const publicAPI = {
-  getSliders: (params) => api.get('/sliders', { params }),
-  getPeople: (params) => api.get('/people', { params }),
-  getPersonBySlug: (slug) => api.get(`/people/${encodeURIComponent(slug)}`),
-  getPrograms: (params) => api.get('/programs', { params }),
-  getProgramDetails: (id) => api.get(`/programs/${id}`),
-  getNews: (params) => api.get('/news', { params }),
-  getNewsById: (id) => api.get(`/news/${id}`),
-  getEvents: (params) => api.get('/events', { params }),
-  getAchievements: (params) => api.get('/achievements', { params }),
-  getNewsletters: (params) => api.get('/newsletters', { params }),
-  getDirectory: () => api.get('/directory'),
-  getInfoBlock: (key) => api.get(`/info/${encodeURIComponent(key)}`),
-  getResearch: (params) => api.get('/research', { params }),
-  getFacilities: (params) => api.get('/facilities', { params }),
+  getSliders: (params) => api.get('/public/sliders', { params }),
+  getPeople: (params) => api.get('/public/people', { params }),
+  getPersonBySlug: (slug) =>
+    api.get(`/public/people/${encodeURIComponent(slug)}`),
+
+  getPrograms: (params) => api.get('/public/programs', { params }),
+  getProgramDetails: (id) => api.get(`/public/programs/${id}`),
+
+  getNews: (params) => api.get('/public/news', { params }),
+  getNewsById: (id) => api.get(`/public/news/${id}`),
+
+  getEvents: (params) => api.get('/public/events', { params }),
+  getEventById: (id) => api.get(`/public/events/${id}`), // ✅ FIX
+
+  getAchievements: (params) => api.get('/public/achievements', { params }),
+
+  getNewsletters: (params) => api.get('/public/newsletters', { params }),
+  getDirectory: () => api.get('/public/directory'),
+
+  getInfoBlock: (key) =>
+    api.get(`/public/info/${encodeURIComponent(key)}`),
+
+  getResearch: (params) => api.get('/public/research', { params }),
+  getFacilities: (params) => api.get('/public/facilities', { params }),
 };
+
 
 // ========================
 // ADMIN APIs (named export)
@@ -119,7 +130,10 @@ export const adminAPI = {
   // Section content (overview/info)
   saveSectionContent: (data) => api.post(`/admin/programs/sections/content`, data),
   getProgramDetailsAdmin: (programId) => api.get(`/admin/programs/${programId}`),
-
+  uploadEditorImage: (formData) =>
+  api.post('/admin/upload-editor-image', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
   // News
   getNews: () => api.get('/admin/news'),
   createNews: (formData) =>
